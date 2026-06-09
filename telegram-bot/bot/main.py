@@ -54,8 +54,11 @@ def build_application() -> Application:
 
 
 def _start_health_server() -> None:
-    """Minimal HTTP server so Render/UptimeRobot can keep the process alive."""
+    """Minimal HTTP server for health checks (Web Service deployments)."""
     port = int(os.environ.get("PORT", 8080))
+
+    class _Server(HTTPServer):
+        allow_reuse_address = True
 
     class _Handler(BaseHTTPRequestHandler):
         def do_GET(self):
@@ -66,7 +69,12 @@ def _start_health_server() -> None:
         def log_message(self, *args):
             pass
 
-    HTTPServer(("0.0.0.0", port), _Handler).serve_forever()
+    try:
+        server = _Server(("0.0.0.0", port), _Handler)
+        logger.info("Health server listening on port %d", port)
+        server.serve_forever()
+    except Exception:
+        logger.exception("Health server failed to start")
 
 
 def main() -> None:
