@@ -1,4 +1,7 @@
 import logging
+import os
+import threading
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from telegram.ext import Application, CommandHandler, MessageHandler, filters
 
@@ -50,7 +53,24 @@ def build_application() -> Application:
     return application
 
 
+def _start_health_server() -> None:
+    """Minimal HTTP server so Render/UptimeRobot can keep the process alive."""
+    port = int(os.environ.get("PORT", 8080))
+
+    class _Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            self.send_response(200)
+            self.end_headers()
+            self.wfile.write(b"ok")
+
+        def log_message(self, *args):
+            pass
+
+    HTTPServer(("0.0.0.0", port), _Handler).serve_forever()
+
+
 def main() -> None:
+    threading.Thread(target=_start_health_server, daemon=True).start()
     application = build_application()
     logger.info("Starting DailyFlow Telegram bot (polling)")
     application.run_polling(allowed_updates=["message"])
